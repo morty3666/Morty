@@ -1,4 +1,4 @@
-//MEM stage  Jesus Colmenares / 14-11384
+//MEM stage  
 
 `include "LSU.v"
 `include "load_unit.v"
