@@ -10,7 +10,7 @@ module ex_stage(//Inputs
 				input wire [31:0] csr_data_ex_i, //data for CSR
 				input wire [11:0] csr_addr_ex_i, //CSR address
 				input wire [31:0] rs2_data_ex_i, //Data from rs2 to be written in MEM
-				input wire [3:0] trap_code_ex_i, //Each bit represent an exception type.
+				input wire [3:0] trap_code_ex_i, 
 				input wire is_trap_ex_i, //flag for exceptions
 				//Outputs
 				output reg [31:0] PC4_ex_o,
