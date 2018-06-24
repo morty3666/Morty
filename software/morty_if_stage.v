@@ -12,7 +12,7 @@ module if_stage
 				 output reg [31:0] instr_o,  //fetched instruction
 				 output reg [31:0] PC4_if_o, //PC+4
 				 output reg [31:0] PC_if_o,  //PC
-				 output reg [10:0] trap_code_if_o,  //trap code
+				 output reg [3:0] trap_code_if_o,  //trap code
 				 output reg is_trap_if_o,     //flag for trap
 				 output reg  stall_if_o, //stall if in process.
 				 //Wishbone
@@ -144,15 +144,15 @@ module if_stage
 
     	if(pc[1:0]!=2'b0)  begin
     		is_trap_if_o=1'b1;
-    		trap_code_if_o=11'b00_000_000_010;
+    		trap_code_if_o=4'b0;  //INSTRUCTION MISALIGNED
     	end
     	else if (access_fault==1'b1) begin
     		is_trap_if_o=1'b1;
-    		trap_code_if_o=11'b00_000_000_001;    		
+    		trap_code_if_o=4'b01;  //ACCESS FAULT  		
     	end
     	else begin
     		is_trap_if_o=1'b0;
-    		trap_code_if_o=11'b0;
+    		trap_code_if_o=4'b0;
     		
     	end
 
