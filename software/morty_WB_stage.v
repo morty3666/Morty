@@ -26,6 +26,7 @@ module WB_stage(
 				input wire is_rs1_wb_i,
 				//Outputs
 				output reg [31:0] writeback_data_o,
+				output reg [4:0] rd_wb_o,
 				output reg	rf_we_wb_o,
 				output reg  is_trap_wb_o  //Signal to hazard unit.
 				);
@@ -55,7 +56,8 @@ module WB_stage(
 			endcase	
 
 			//Propagate WE to RF
-			rf_we_wb_o=rf_we_wb_i;		
+			rf_we_wb_o=rf_we_wb_i;
+			rd_wb_o=rd_wb_i;
 		end
 
 		//Implementing CSR
