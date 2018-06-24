@@ -13,7 +13,7 @@ module MEM_stage(   //inputs
 					input wire [31:0] rs2_data_mem_i,  //DATA FROM RS2  - WISHBONE DATA TO MEMORY
 					input wire [31:0] csr_data_mem_i,  //DATA TO BE USED BY CSR     (P)
 					input wire [11:0] csr_addr_mem_i,  //CSR ADDRESS                 (P)
-					input wire [10:0] trap_code_mem_i,  //EXCEPTION CODE             (P)
+					input wire [3:0] trap_code_mem_i,  //EXCEPTION CODE             (P)
 					input wire is_trap_mem_i,  //TRAP FLAG                            (P)
 					input wire we_mem_ctrl_i,  //Control Signal
 					input wire is_LS_mem_ctrl_i, //Control Signal
@@ -30,7 +30,7 @@ module MEM_stage(   //inputs
 					output reg [4:0] rd_mem_o,      // (P)
 					output reg [31:0] csr_data_mem_o,   // (P)
 					output reg [11:0] csr_addr_mem_o,    // (P)
-					output reg [10:0] trap_code_mem_o,    // (P)
+					output reg [3:0] trap_code_mem_o,    // (P)
 					output reg		  is_trap_mem_o,      // (P)
 					output reg [31:0] wbm_addr_mem_o,  //WB
                  	output reg [31:0] wbm_dat_mem_o,	//WB
