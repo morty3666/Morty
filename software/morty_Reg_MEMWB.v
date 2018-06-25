@@ -19,7 +19,7 @@ module Register_MEMWB(
 						output reg [31:0] data_ALUo_o,
 						output reg [11:0] CSR_o,
 						output reg [31:0] drs1_imm_o,
-						output reg [10:0] exc_o);
+						output reg [3:0] exc_o);
 
 		always @(posedge clk) begin
 			rd_o <= ((clear_memwb) || (rst)) ? 5'b0 : ((stall_memwb) ? rd_o : rd_i);
