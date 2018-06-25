@@ -13,7 +13,7 @@ module Register_IFID(
 						output reg [31:0] inst_o,		
 						output reg [31:0] pc_o,
 						output reg [31:0] pc4_o,
-						output reg [10:0] exc_o);
+						output reg [3:0] exc_o);
 
 		always @(posedge clk) begin
 			pc_o <= ((clear_ifid) || (rst)) ? 32'b0 : ((stall_ifid) ? pc_o : pc_i);
