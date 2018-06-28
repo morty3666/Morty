@@ -32,6 +32,7 @@ module if_stage
 		reg [31:0] pc;
 		wire [31:0] next_pc;
 		wire access_fault;
+		wire misaligned_flag;  //flag for instr misaligned
 
 		//Updating PC
 		always @(posedge clk_i) begin
@@ -44,9 +45,10 @@ module if_stage
 			  else 
 				pc <= pc;				
 			end
+			
 		end
 
-
+		
 		always @(*) begin
 			
 			case(PC_control_i)
@@ -66,6 +68,12 @@ module if_stage
 			wbm_addr_if_o=pc;
 			instr_o=wbm_dat_if_i;  //Instruction is what comes from memory.
 
+			//Check if pc is aligned
+			if(pc[1:0]==2'b0)
+				misaligned_flag=1'b0;
+			else 
+				misaligned_flag=1'b1;
+
 		end
 
 		//state machine
@@ -82,11 +90,11 @@ module if_stage
 			if (rst_i) 
 				state <= start_fetch;
 
-			else if (state==start_fetch & wbm_ack_if_i==0 & wbm_err_if_i==0) 
+			else if (state==start_fetch & wbm_ack_if_i==0 & wbm_err_if_i==0 & misaligned_flag==0) 
 
 				state <= start_fetch;
 
-			else if (state==start_fetch & wbm_err_if_i==1) 
+			else if (state==start_fetch & (wbm_err_if_i==1 | misaligned_flag==1)) 
 
 				state <= err_fetch;
 				
@@ -98,9 +106,13 @@ module if_stage
 
 				state <= start_fetch;				
 
-			else if (state==end_fetch) 
+			else if (state==end_fetch & PC_en==1'b1) 
 
 				state <= start_fetch;
+
+			else if (state==end_fetch & PC_en==1'b0) 
+
+				state <= end_fetch;
 				
 			else 
 			    state <= start_fetch;						
@@ -129,24 +141,29 @@ module if_stage
 			  		wbm_cyc_if_o=1'b0;
 			  	  	wbm_stb_if_o = 1'b0;
 			  	  	stall_if_o=1'b0;
-			  	  	access_fault=1'b1;			  		
+			  	  	if(wbm_err_if_i)
+			  	  		access_fault=1'b1;
+			  	  	else 
+			  	  		access_fault=1'b0;			  		
 			  	end
 			  	else begin
+
 			  		wbm_cyc_if_o=1'b0;
 			  	  	wbm_stb_if_o = 1'b0;
 			  	  	stall_if_o=1'b0;
-			  	  	access_fault=1'b1;			  	 		
+			  	  	access_fault=1'b0;
+
 			  	 	end 		  	 
 	  end
     
     //Exceptions
     always @(*) begin
 
-    	if(pc[1:0]!=2'b0)  begin
+    	if(misaligned_flag)  begin
     		is_trap_if_o=1'b1;
     		trap_code_if_o=4'b0;  //INSTRUCTION MISALIGNED
     	end
-    	else if (access_fault==1'b1) begin
+    	else if (access_fault) begin
     		is_trap_if_o=1'b1;
     		trap_code_if_o=4'b01;  //ACCESS FAULT  		
     	end
@@ -159,4 +176,5 @@ module if_stage
     end
 
    endmodule
+
 
