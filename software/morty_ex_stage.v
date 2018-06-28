@@ -12,6 +12,7 @@ module ex_stage(//Inputs
 				input wire [31:0] rs2_data_ex_i, //Data from rs2 to be written in MEM
 				input wire [3:0] trap_code_ex_i, 
 				input wire is_trap_ex_i, //flag for exceptions
+				input wire is_rs0_i,
 				//Outputs
 				output reg [31:0] PC4_ex_o,
 				output reg [31:0] PC_ex_o,
@@ -21,6 +22,7 @@ module ex_stage(//Inputs
 				output reg [31:0] rs2_data_ex_o,
 				output reg [3:0] trap_code_ex_o, 
 				output reg is_trap_ex_o, 
+				output reg is_rs0_o,
 				output reg [31:0] alu_out_ex_o  //alu result after execution.
 				);
 
@@ -35,7 +37,8 @@ module ex_stage(//Inputs
 		csr_addr_ex_o = csr_addr_ex_i ;
 		rs2_data_ex_o = rs2_data_ex_i;
 		trap_code_ex_o = trap_code_ex_i; 
-		is_trap_ex_o = is_trap_ex_i; 
+		is_trap_ex_o = is_trap_ex_i;
+		is_rs0_o=is_rs0_i; 
 
 		//ALU operations
 		case(alu_op_ex_i)
