@@ -2,6 +2,7 @@
 
 module LSU( input wire is_LS_i,
 			input wire [2:0] funct3_i,
+			input wire [1:0] addr_i,
 			//Wishbone signals
 			input wire        wbm_ack_i,  
             input wire        wbm_err_i,                 
@@ -29,42 +30,44 @@ module LSU( input wire is_LS_i,
 					wbm_stb_o=1'b0;
 					wbm_cyc_o=1'b0;				
 					stall_o=1'b0;
-					wbm_sel_o=4'b0;
-					
+					wbm_sel_o=4'b0;					
 				end
-
 				else begin
-
 					wbm_stb_o=1'b1;
 					wbm_cyc_o=1'b1;				
 					stall_o=1'b1;
 
 					case(funct3_i)
 
-						SB: wbm_sel_o=4'b0001;
-						SH: wbm_sel_o=4'b0011;
+						SB: begin
+							case(addr_i)
+								2'b00: wbm_sel_o=4'b0001;
+								2'b01: wbm_sel_o=4'b0010;
+								2'b10: wbm_sel_o=4'b0100;
+								2'b11: wbm_sel_o=4'b1000;
+							endcase						
+						end
+						SH: begin
+							case(addr_i[0])
+								1'b0: wbm_sel_o=4'b0011;
+								1'b1: wbm_sel_o=4'b1100;								
+							endcase							
+						end
 						SW: wbm_sel_o=4'b1111;
 						default: wbm_sel_o=4'b0;
-
-					endcase					
-
+					endcase		
 				end
-
 		end
-
 		else begin
 			wbm_stb_o=1'b0;
 			wbm_cyc_o=1'b0;
 			wbm_sel_o=4'b0;			
 			stall_o=1'b0;
 
-		end
-
-		
+		end		
 	end
 
 endmodule
-
 
 
             
