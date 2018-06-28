@@ -33,8 +33,8 @@ module load_unit( 	input wire [31:0] data_mem_i,
 
 		case(funct3_i)
 
-			LB: data_mem_o={{24{data_mem_i[7]}}, data_sel_LB};			
-			LH: data_mem_o={{16{data_mem_i[15]}}, data_sel_LH};
+			LB: data_mem_o={{24{data_sel_LB[7]}}, data_sel_LB};			
+			LH: data_mem_o={{16{data_sel_LH[15]}}, data_sel_LH};
 			LW: data_mem_o=data_mem_i;
 			LBU: data_mem_o={24'b0, data_sel_LB};
 			LHU: data_mem_o={16'b0, data_sel_LH};
@@ -45,6 +45,7 @@ module load_unit( 	input wire [31:0] data_mem_i,
 	end
 
 endmodule
+
 
 	
 	
