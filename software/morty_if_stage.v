@@ -1,13 +1,13 @@
 //IF stage XYZ processor
 
 module if_stage
-			#(	 parameter [31:0] RESET_ADDR = 32'h0000_0000) //PC at reset
+			#(	 parameter [31:0] RESET_ADDR = 32'h8000_0000) //PC at reset
 		     (	 input wire clk_i, //clock
 				 input wire rst_i,  //reset
-				 input wire [31:0] PC_JB_i,  //PC jump or branch
+				 input wire [31:0] next_PC_JB_i,  //PC jump or branch
 				 input wire [31:0] PC_trap_i, //PC if trap
-				 input wire [1:0]  PC_control_i, //Control signal
-				 input wire		   PC_en,  //PC enable	
+				 input wire [1:0]  next_PC_control_i, //Control signal
+				 input wire		   IF_en,  //IF enable	
 
 				 output reg [31:0] instr_o,  //fetched instruction
 				 output reg [31:0] PC4_if_o, //PC+4
@@ -16,12 +16,9 @@ module if_stage
 				 output reg is_trap_if_o,     //flag for trap
 				 output reg  stall_if_o, //stall if in process.
 				 //Wishbone
-				 output reg [31:0] wbm_addr_if_o,
-                 output reg [31:0] wbm_dat_if_o,
-                 output reg [ 3:0] wbm_sel_if_o,
+				 output reg [31:0] wbm_addr_if_o,                 
                  output reg        wbm_cyc_if_o,
-                 output reg        wbm_stb_if_o,
-                 output reg        wbm_we_if_o,
+                 output reg        wbm_stb_if_o,                 
                  //
                  input wire [31:0] wbm_dat_if_i,
                  input wire        wbm_ack_if_i,
@@ -33,17 +30,26 @@ module if_stage
 		wire [31:0] next_pc;
 		wire access_fault;
 		wire misaligned_flag;  //flag for instr misaligned
+		wire PC_en;
+		reg [1:0] PC_control;
+		reg [31:0] PC_JB;
+		wire is_JB = PC_control ==2'b01;		
 
 		//Updating PC
 		always @(posedge clk_i) begin
 			if (rst_i) begin
-				pc <= RESET_ADDR;				
+				pc <= RESET_ADDR;
+				PC_control <= 2'b0;
+				PC_JB <= 32'b0;				
 			end
 			else  begin
-			  if(PC_en)
-				pc <= next_pc;
+			  if((IF_en & PC_en) | PC_control==2'b01 | PC_control==2'b10) 
+			  	pc <= next_pc;			  			
 			  else 
-				pc <= pc;				
+			  	pc <= pc;
+			  PC_control <=next_PC_control_i;
+			  PC_JB <= next_PC_JB_i;			  			  
+
 			end
 			
 		end
@@ -51,20 +57,17 @@ module if_stage
 		
 		always @(*) begin
 			
-			case(PC_control_i)
+			case(PC_control)
 
 				2'b00: next_pc=pc+4;    //Just PC+4
-				2'b01: next_pc=PC_JB_i;  //If jump/branch
+				2'b01: next_pc=PC_JB;  //If jump/branch
 				2'b10: next_pc=PC_trap_i;  //If trap
 				default: next_pc=PC_trap_i;
 
 			endcase
 
 			PC4_if_o=pc+4;
-			PC_if_o=pc;
-			wbm_we_if_o=1'b0;  //Just read memory
-			wbm_dat_if_o=32'b0;  //Dont care
-			wbm_sel_if_o=4'b1111; //Dont care.
+			PC_if_o=pc;			
 			wbm_addr_if_o=pc;
 			instr_o=wbm_dat_if_i;  //Instruction is what comes from memory.
 
@@ -106,11 +109,11 @@ module if_stage
 
 				state <= start_fetch;				
 
-			else if (state==end_fetch & PC_en==1'b1) 
+			else if (state==end_fetch & IF_en==1'b1) 
 
 				state <= start_fetch;
 
-			else if (state==end_fetch & PC_en==1'b0) 
+			else if (state==end_fetch & IF_en==1'b0) 
 
 				state <= end_fetch;
 				
@@ -126,20 +129,26 @@ module if_stage
 			  	
 			  	  	wbm_cyc_if_o=1'b1;
 			  	  	wbm_stb_if_o = 1'b1;
+			  	  	PC_en=1'b0;
 			  	  	stall_if_o=1'b1;
 			  	  	access_fault=1'b0;
 			  	end
 
 			  	else if(state==end_fetch)   begin
 			  		wbm_cyc_if_o=1'b0;
-			  	  	wbm_stb_if_o = 1'b0;
-			  	  	stall_if_o=1'b0;
-			  	  	access_fault=1'b0;			  		
+			  	  	wbm_stb_if_o = 1'b0;			  	  	
+			  	  	PC_en=1'b1;			  	  	
+			  	  	access_fault=1'b0;
+			  	  	if (is_JB) 
+			  	  		stall_if_o=1'b1;
+			  	  	else
+			  	  		stall_if_o=1'b0; 			  		
 			  	end 
 
 			  	else if (state==err_fetch) begin
 			  		wbm_cyc_if_o=1'b0;
 			  	  	wbm_stb_if_o = 1'b0;
+			  	  	PC_en=1'b0;
 			  	  	stall_if_o=1'b0;
 			  	  	if(wbm_err_if_i)
 			  	  		access_fault=1'b1;
@@ -150,6 +159,7 @@ module if_stage
 
 			  		wbm_cyc_if_o=1'b0;
 			  	  	wbm_stb_if_o = 1'b0;
+			  	  	PC_en=1'b0;
 			  	  	stall_if_o=1'b0;
 			  	  	access_fault=1'b0;
 
