@@ -14,7 +14,7 @@
 //
 
   module xyz #( parameter [31:0] HART_ID = 32'b0,
-                parameter [31:0] RESET_ADDR = 32'h0000_0000,
+                parameter [31:0] RESET_ADDR = 32'h8000_0000,
                 parameter ENABLE_COUNTERS = 1'b0,
                 parameter ENABLE_M_ISA =1'b0,
                 parameter UCONTROL = 1'b0
@@ -141,6 +141,7 @@
 			//
 			wire [4:0] rd_wb_o; 		
 			 wire is_PC_csr;
+             wire [31:0] CSR_data_out;
 			 assign is_PC_csr = is_trap_wb_o | is_mret_wb;
              //--------------------------------------------------------------------------------------------------------------------------	
 
@@ -154,10 +155,27 @@
 			 wire [31:0] fwb; 
 			 wire [1:0] ctrl_forwa; //SEL MUX FW1
 			 wire [1:0] ctrl_forwb; //SEL MUX FW2
-             //
-             assign fexc = alu_out_ex_o;
-             assign fmem = data_wb_mem;
-             assign fwb = data_from_wb;
+             //--------------------------------------------------------------------------------------------------------------------------
+             //forwarding
+             always @(*) begin
+
+                if(is_comp_ex)
+                    fexc = {31'b0, comp_ex};
+                else 
+                    fexc = alu_out_ex_o;
+
+                if(is_comp_mem)
+                    fmem = {31'b0, comp_mem};
+                else 
+                    fmem = data_wb_mem;
+
+                if(is_comp_wb)
+                    fwb = {31'b0,comp_wb};
+                else 
+                    fwb = data_from_wb;              
+                 
+             end
+            
              //--------------------------------------------------------------------------------------------------------------------------
 
 			 //Control signals
@@ -165,9 +183,10 @@
 			 wire	  branch_taken_id;  //For hazard unit
 			  //Control signals in ID
 			 wire [1:0] PC_control_if;
-			 wire [1:0] ctrl_muxa;
+			 wire [1:0] ctrl_muxa, ctrl_muxb;
+             wire is_FW_id;
              /* verilator lint_off UNOPTFLAT */
-			 wire  ctrl_muxb, ctrl_muxcsr, ctrl_muxj;			
+			 wire  ctrl_muxcsr, ctrl_muxj;			
 			 wire [2:0] type_imm;
 			 wire we_mem_id;
 			 wire is_LS_id;
@@ -177,7 +196,7 @@
 			 wire we_wb_id;
 			 wire [1:0] mux_wb_sel_id;
 			 wire [1:0] csr_op_id;
-			 wire comp_id;
+			 wire comp_id, is_comp_id;
 			 wire is_csr_id;
 			 wire is_mret_id;  //Flag for CSR to mret instr.
 			 wire is_trap_decode;
@@ -186,12 +205,13 @@
 			wire  we_mem_ex;
   		    wire  is_LS_ex;
   		    wire  [2:0] funct3_mem_ex;
+            wire is_FW_ex;
   		    wire  data_or_alu_ex;
   		    wire  [2:0] alu_op_ex_ex;
   		    wire  we_wb_ex;
   		    wire  [1:0] mux_wb_sel_ex;
   		    wire  [1:0] csr_op_ex;
-  	    	wire   comp_ex;
+  	    	wire   comp_ex, is_comp_ex;
   		    wire  is_csr_ex;
   		    wire  is_mret_ex;
   		    	//Control signals in MEM
@@ -202,17 +222,20 @@
   		    wire  we_wb_mem;
   		    wire  [1:0] mux_wb_sel_mem;
   		    wire  [1:0] csr_op_mem;
-  	    	wire   comp_mem;
+  	    	wire   comp_mem, is_comp_mem;
   		    wire  is_csr_mem;
   		    wire  is_mret_mem;
+            wire is_FW_mem;
   		    	//Control signals in WB  		    
   		    wire  we_wb_wb_i;
   		    wire  we_wb_wb_o;
   		    wire  [1:0] mux_wb_sel_wb;
   		    wire  [1:0] csr_op_wb;
-  	    	wire   comp_wb;
+  	    	wire   comp_wb, is_comp_wb;
   		    wire  is_csr_wb;
   		    wire  is_mret_wb;
+            wire is_FW_wb;
+
             //--------------------------------------------------------------------------------------------------------------------------	
 			 
 			 //Regs between stages
@@ -223,43 +246,52 @@
 			 assign rst4 = rst_i | rst_stages[0];
              //--------------------------------------------------------------------------------------------------------------------------
              //Exception handling between stages
+
+             wire is_trap_if_o;
+             wire [3:0] trap_code_if_o;
+             wire is_trap_id_oo;
+             wire [3:0] trap_code_id_oo;
+             wire is_trap_ex_oo;
+             wire [3:0] trap_code_ex_oo;
+             wire is_trap_mem_oo;
+             wire [3:0] trap_code_mem_oo;
                 
-                always @(posedge clk_i) begin
+                always @(*) begin
                  
                  if(is_trap_if) begin
-                     is_trap_id_i <=1'b1;
-                     trap_code_id_i <=trap_code_if;
+                     is_trap_if_o =1'b1;
+                     trap_code_if_o =trap_code_if;
                  end
                  else begin
-                    is_trap_id_i <= 1'b0;
-                    trap_code_id_i <= 4'b0;                     
+                    is_trap_if_o = 1'b0;
+                    trap_code_if_o = 4'b0;                     
                  end
 
                  if(is_trap_id_o) begin
-                     is_trap_ex_i <=1'b1;
-                     trap_code_ex_i <=trap_code_id_o;
+                     is_trap_id_oo =1'b1;
+                     trap_code_id_oo =trap_code_id_o;
                  end
                  else begin
-                    is_trap_ex_i <= is_trap_decode;
-                     trap_code_ex_i <= cause_trap_decode;                     
+                    is_trap_id_oo = is_trap_decode;
+                     trap_code_id_oo = cause_trap_decode;                     
                  end
 
                  if(is_trap_ex_o) begin
-                     is_trap_mem_i <=1'b1;
-                     trap_code_mem_i <=trap_code_ex_o;
+                     is_trap_ex_oo =1'b1;
+                     trap_code_ex_oo =trap_code_ex_o;
                  end
                  else begin
-                    is_trap_mem_i <=1'b0;
-                    trap_code_mem_i <= 4'b0;                    
+                    is_trap_ex_oo =1'b0;
+                    trap_code_ex_oo = 4'b0;                    
                  end
 
                  if(is_trap_mem_o) begin
-                     is_trap_wb_i <=1'b1;
-                     trap_code_wb <=trap_code_mem_o;
+                     is_trap_mem_oo =1'b1;
+                     trap_code_mem_oo =trap_code_mem_o;
                  end
                  else begin
-                    is_trap_wb_i <=1'b0;
-                     trap_code_wb <= 4'b0;                    
+                    is_trap_mem_oo =1'b0;
+                     trap_code_mem_oo = 4'b0;                    
                  end
                  
              end
@@ -273,7 +305,7 @@
   			 if_stage IF_ins(clk_i,
   			 				 rst_i,
   			 				 PC_JB_if,
-  			 				 data_from_wb,   //PC for trap
+  			 				 CSR_data_out,   //PC for trap
   			 				 PC_control_if,
   			 				 IF_en,
   			 				 instr_if,
@@ -294,14 +326,14 @@
   			 //Reg from IF to ID
   			 reg_if_id reg_if_id_ins(clk_i,
   			 						 rst1, //rst
-  			 						 is_trap_if,  //clear is trap in IF
+  			 						 is_trap_if_o,  //clear is trap in IF
   			 						 en_stages[3],
   			 						 //From IF
   			 						 instr_if,
   			 						 PC4_if,
   			 						 PC_if,
-  			 						 trap_code_if,
-  			 						 is_trap_if,
+  			 						 trap_code_if_o,
+  			 						 is_trap_if_o,
   			 						 //To ID
   			 						 instr_id,
   			 						 PC4_id_i,
@@ -369,17 +401,19 @@
   			 						  mux_wb_sel_id,
   			 						  csr_op_id,
   			 						  comp_id,
+                                      is_comp_id,
   			 						  is_csr_id,
   			 						  is_mret_id,
   			 						  is_trap_decode,
   			 						  cause_trap_decode,
-  			 						  branch_taken_id
+  			 						  branch_taken_id,
+                                      is_FW_id
   			 						  );
 
   			 //Reg from ID to EX
   			 reg_id_ex reg_id_ex_ins( clk_i,
   			 						  rst2,
-  			 						  is_trap_id_o, //clear if trap in ID
+  			 						  is_trap_id_oo, //clear if trap in ID
   			 						  en_stages[2],
   			 						  //From ID
   			 						  instr_id[6:0],
@@ -390,8 +424,8 @@
 									  port_b_id,
 									  CSR_addr_id,
 									  CSR_data_id,
-									  trap_code_id_o,  //CHECK
-									  is_trap_id_o,   //CHECK
+									  trap_code_id_oo,  //CHECK
+									  is_trap_id_oo,   //CHECK
 									  forw_b_id,									
 									  is_rs0_id,
 									  //from control
@@ -406,6 +440,8 @@
   			 						  comp_id,
   			 						  is_csr_id,
   			 						  is_mret_id,
+                                      is_FW_id,
+                                      is_comp_id,
   			 						  //To EX
   			 						  opcode_ex,
   			 						  rd_ex_i,
@@ -430,7 +466,9 @@
   		                              csr_op_ex,
   	    	                          comp_ex,
   		                              is_csr_ex,
-  		                              is_mret_ex
+  		                              is_mret_ex,
+                                      is_FW_ex,
+                                      is_comp_ex
   		                              );
 
   			 ex_stage ex_stage_ins( PC4_ex_i,
@@ -460,7 +498,7 @@
 
   			 reg_ex_mem reg_ex_mem_ins( clk_i,
   			 							rst3,
-  			 							is_trap_ex_o,
+  			 							is_trap_ex_oo,
   			 							en_stages[1],
   			 							//From EX
   			 							opcode_ex,
@@ -470,8 +508,8 @@
 										csr_data_ex_o,
 										csr_addr_ex_o,
 										rs2_data_ex_o,
-									    trap_code_ex_o, 
-										is_trap_ex_o, 
+									    trap_code_ex_oo, 
+										is_trap_ex_oo, 
 										is_rs0_ex_o,
 										alu_out_ex_o,
 										//control
@@ -485,6 +523,8 @@
 							  	    	comp_ex,
 							  		    is_csr_ex,
 							  		    is_mret_ex,
+                                        is_FW_ex,
+                                        is_comp_ex,
 							  		    //To MEM
 							  		    opcode_mem,
 							  		    PC4_mem_i,
@@ -507,10 +547,13 @@
   		                                csr_op_mem,
   	    	                            comp_mem,
   		                                is_csr_mem,
-  		                                is_mret_mem
+  		                                is_mret_mem,
+                                        is_FW_mem,
+                                        is_comp_mem
   			 							);
 
-  			 MEM_stage MEM_stage_ins( PC4_mem_i,
+  			 MEM_stage MEM_stage_ins( clk_i,
+                                     PC4_mem_i,
   			 						  PC_mem_i,
   			 						  rd_mem_i,
   			 						  alu_out_mem_i,
@@ -552,7 +595,7 @@
 
   			 reg_mem_wb reg_mem_wb_ins( clk_i,
   			 							rst4,
-  			 							is_trap_mem_o,
+  			 							is_trap_mem_oo,
   			 							en_stages[0],
   			 							//From MEM
   			 							PC4_mem_o,   
@@ -560,8 +603,8 @@
 			                            rd_mem_o,     
 			                            csr_data_mem_o, 
 			                            csr_addr_mem_o,    
-				                        trap_code_mem_o,   
-			                            is_trap_mem_o,     
+				                        trap_code_mem_oo,   
+			                            is_trap_mem_oo,     
 			                            is_rs0_mem_o,
 			                            data_wb_mem,
 			                            //control  		   
@@ -571,6 +614,8 @@
   	                                    comp_mem,
   	                                    is_csr_mem,
   		                                is_mret_mem,
+                                        is_FW_mem,
+                                        is_comp_mem,
   		                                //To WB
   		                                PC4_wb,   
 										PC_wb,     
@@ -587,7 +632,9 @@
 							  		    csr_op_wb,
 							  	    	comp_wb,
 							  		    is_csr_wb,
-							  		    is_mret_wb
+							  		    is_mret_wb,
+                                        is_FW_wb,
+                                        is_comp_wb
   			 							);
 
   			 WB_stage WB_stage_ins ( clk_i,
@@ -617,7 +664,8 @@
                                      data_from_wb,
                                      rd_wb_o,
                                      we_wb_wb_o,
-                                     is_trap_wb_o
+                                     is_trap_wb_o,
+                                     CSR_data_out
                                      );
 
   			 hazard_unit hazard_unit_ins( rd_ex_i,
@@ -633,6 +681,9 @@
   			 							  stall_if,
   			 							  is_trap_wb_o,
   			 							  is_mret_wb,
+                                          is_FW_ex,
+                                          is_FW_mem,
+                                          is_FW_wb,
   			 							  //outputs
   			 							  ctrl_forwa,
   			 							  ctrl_forwb,
@@ -641,6 +692,3 @@
   			 							  IF_en
   			 	                          );
 endmodule  
-
-
-
