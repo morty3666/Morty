@@ -1,5 +1,5 @@
 
-module titan_comparator (
+module morty_comparator (
 		   input [2:0] sel, 
 		   input [31:0] drs1,
 		   input [31:0] drs2, 

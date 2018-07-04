@@ -1,5 +1,5 @@
 
-module titan_pc_reg #(
+module morty_pc_reg #(
 		parameter [31:0] RESET_ADDR=32'h0000_0000
 		)(
 		input 			clk_i,

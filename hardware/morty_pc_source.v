@@ -1,5 +1,5 @@
 
-module titan_pc_source (
+module morty_pc_source (
 		  input 	[31:0] 	in0,
 		  input 	[31:0] 	in1,
 		  input 	[31:0] 	in2,

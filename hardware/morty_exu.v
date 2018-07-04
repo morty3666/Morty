@@ -1,5 +1,5 @@
 
-module titan_exu (	
+module morty_exu (	
 	 	input 	   [31:0] port_a,
 		input	   [31:0] port_b,
 		input      [ 3:0] alu_op,

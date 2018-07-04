@@ -1,6 +1,6 @@
 
 
-module titan_lsu (
+module morty_lsu (
 			input clk_i,
 			input rst_i,
 			//INTRUCTION INTERFACE
