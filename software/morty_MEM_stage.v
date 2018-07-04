@@ -1,4 +1,4 @@
-//MEM stage  Jesus Colmenares / 14-11384
+	//MEM stage  Jesus Colmenares / 14-11384
 
 `include "LSU.v"
 `include "load_unit.v"
@@ -6,6 +6,7 @@
 // (P) = propagated signals
 
 module MEM_stage(   //inputs
+					input wire clk_i,
 					input wire [31:0] PC4_mem_i,  //PC+4      (P)
 					input wire [31:0] PC_mem_i,  //pc          (P)
 					input wire [4:0] rd_mem_i,  //RD ADDRESS    (P)
@@ -42,9 +43,12 @@ module MEM_stage(   //inputs
                  	output reg        wbm_stb_mem_o,	//WB
                  	output reg        wbm_we_mem_o,	    //WB	        			  
 					output reg [31:0] data_or_alu_o,   //Data from memory or alu, use to WB.
-					output 	 		  stall_mem_o   //This is used to stall datapath when using memory
+					output reg	 		  stall_mem_o   //This is used to stall datapath when using memory
 				);
 
+		localparam SB=3'b000;
+		localparam SH=3'b001;
+		localparam SW=3'b010;
 	
 
 		always @(*) begin
@@ -65,17 +69,40 @@ module MEM_stage(   //inputs
 				wbm_we_mem_o = we_mem_ctrl_i;
 			
 		end
+		/* 
+
+		always @(*) begin
+			case(1'b1)
+				SB: begin
+					case(alu_out_mem_i[1:0])
+						2'b00: wbm_dat_mem_o = rs2_data_mem_i;
+						2'b01: wbm_dat_mem_o = {rs2_data_mem_i[23:0], 8'b0};
+						2'b10: wbm_dat_mem_o = {rs2_data_mem_i[15:0], 16'b0};
+						2'b11: wbm_dat_mem_o = {rs2_data_mem_i[31:24], 24'b0};
+					endcase
+				end
+				SH: begin
+					case(alu_out_mem_i[1])
+						1'b0: wbm_dat_mem_o = rs2_data_mem_i;
+						1'b1: wbm_dat_mem_o = {rs2_data_mem_i[15:0], 16'b0};
+					endcase					
+				end
+				default: wbm_dat_mem_o = rs2_data_mem_i;
+			endcase
+			
+		end   */
 
 
 		 wire [31:0] data_mem_chosen;  //Correct data from memory (LB,LH,LW...)
 
-		 LSU LSU_ins(is_LS_mem_ctrl_i, funct3_mem_ctrl_i, alu_out_mem_i[1:0], wbm_ack_mem_i, wbm_err_mem_i, wbm_sel_mem_o, wbm_cyc_mem_o, wbm_stb_mem_o, stall_mem_o);
+		 LSU LSU_ins(clk_i,is_LS_mem_ctrl_i, funct3_mem_ctrl_i, alu_out_mem_i[1:0], wbm_ack_mem_i, wbm_err_mem_i, wbm_sel_mem_o, wbm_cyc_mem_o, wbm_stb_mem_o, stall_mem_o);
 
 		 load_unit load_unit_ins(wbm_data_mem_i, funct3_mem_ctrl_i, alu_out_mem_i[1:0], data_mem_chosen);
 
 		 assign data_or_alu_o = data_or_alu_ctrl_i ? data_mem_chosen : alu_out_mem_i ;  //MUX choose between alu result or data from memory
 
 	 endmodule
+
 
 
 		
