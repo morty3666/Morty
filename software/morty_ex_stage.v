@@ -4,8 +4,8 @@ module ex_stage(//Inputs
 				input wire [31:0] PC4_ex_i, //PC+4
 				input wire [31:0] PC_ex_i,  //PC
 				input wire [4:0]  rd_ex_i,  //rd address for WB stage
-				input wire [31:0] src_A_ex_i, //alu input
-				input wire [31:0] src_B_ex_i,  //alu input
+				input wire signed [31:0] src_A_ex_i, //alu input
+				input wire signed [31:0] src_B_ex_i,  //alu input
 				input wire [2:0]  alu_op_ex_i, //alu control signal
 				input wire [31:0] csr_data_ex_i, //data for CSR
 				input wire [11:0] csr_addr_ex_i, //CSR address
