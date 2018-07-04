@@ -9,7 +9,7 @@ module control_unit(/* verilator lint_off UNUSED */
 					//Control signals
 					output reg [1:0] PC_control_o,
 					output reg [1:0] ctrl_muxa_o,
-					output reg 	  ctrl_muxb_o,
+					output reg [1:0]  ctrl_muxb_o,
 					output reg ctrl_muxcsr_o,
 					output reg    ctrl_muxj_o,
 					output reg [2:0] type_imm_o,
@@ -22,12 +22,14 @@ module control_unit(/* verilator lint_off UNUSED */
 					output reg [1:0] mux_wb_sel_o,
 					output reg [1:0] csr_op_o,
 					output reg comp_o,
+                    output reg is_comp,
 					output reg is_csr_o,
 					output reg is_mret_o,  //Flag for CSR to mret instr.
 					//More controls signals
 					output reg is_trap_o,
 					output reg [3:0] cause_trap_o,
-					output reg		  branch_taken_o  //for hazard unit.
+					output reg		  branch_taken_o,  //for hazard unit.
+                    output reg is_FW
 					);
 
 
@@ -43,10 +45,11 @@ module control_unit(/* verilator lint_off UNUSED */
     wire   is_add, is_sub, is_sll, is_slt, is_sltu, is_xor, is_srl, is_sra, is_or, is_and;
     wire   is_fence, is_nop;
     wire   is_csrrw, is_csrrs, is_csrrc, is_csrrwi, is_csrrsi, is_csrrci;
+    wire   is_shamt, is_shift;
    	wire   is_ecall, is_ebreak, is_mret;
 
     //General flags
-    wire is_u, is_j, is_branch, is_load, is_store, is_CSR, is_CSR_i, is_CSR_r, is_alu_r, is_alu_i, is_alu, is_comp;
+    wire is_u, is_j, is_branch, is_load, is_store, is_CSR, is_CSR_i, is_CSR_r, is_alu_r, is_alu_i, is_alu;
     
     //Exceptions codes
     localparam E_ILLEGAL_INST  = 4'd2;
@@ -125,10 +128,13 @@ module control_unit(/* verilator lint_off UNUSED */
             is_alu_i=  is_addi | is_slti| is_sltiu | is_xori | is_ori | is_andi | is_slli | is_srli | is_srai;
             is_alu_r = is_add | is_sub | is_slt | is_sltu | is_xor | is_or | is_and | is_sll | is_srl | is_sra;
             is_alu = is_alu_i | is_alu_r;
+            is_shamt = is_slli | is_srli | is_srai;
+            is_shift= is_sll | is_srl | is_sra;
             is_comp = is_slti| is_sltiu | is_slt | is_sltu;
             is_CSR_r = is_csrrw | is_csrrs | is_csrrc; 
             is_CSR_i = is_csrrwi | is_csrrsi | is_csrrci;
             is_CSR = is_CSR_r | is_CSR_i;
+            is_FW= is_u | is_j | is_load | is_alu | is_CSR;
 
      end
 
@@ -142,7 +148,7 @@ module control_unit(/* verilator lint_off UNUSED */
      				ctrl_muxa_o=2'b10;
      			else
      				ctrl_muxa_o=2'b01;
-     			ctrl_muxb_o=1'b1;
+     			ctrl_muxb_o=2'b1;
      			type_imm_o=3'b0;
      			is_LS_o=1'b0;
      			data_or_alu_o=1'b0;
@@ -151,6 +157,7 @@ module control_unit(/* verilator lint_off UNUSED */
      			mux_wb_sel_o=2'b0;
      			is_csr_o=1'b0;
      			is_trap_o=1'b0;
+                is_mret_o=1'b0; 
      		end
 
      		is_j: begin     			
@@ -167,11 +174,12 @@ module control_unit(/* verilator lint_off UNUSED */
      			mux_wb_sel_o=2'b01;
      			is_csr_o=1'b0;
      			is_trap_o=1'b0;
+                is_mret_o=1'b0; 
      		end
 
      		is_load: begin
      			ctrl_muxa_o=2'b0;
-     			ctrl_muxb_o=1'b1;
+     			ctrl_muxb_o=2'b1;
      			type_imm_o=3'b001;
      			we_mem_o=1'b0;
      			is_LS_o=1'b1;
@@ -182,11 +190,12 @@ module control_unit(/* verilator lint_off UNUSED */
      			is_csr_o=1'b0;
      			is_trap_o=1'b0;
      			funct3_mem_o=instr[14:12];
+                is_mret_o=1'b0; 
      		end
 
      		is_store: begin
      			ctrl_muxa_o=2'b0;
-     			ctrl_muxb_o=1'b1;
+     			ctrl_muxb_o=2'b1;
      			type_imm_o=3'b100;
      			we_mem_o=1'b1;
      			is_LS_o=1'b1;     		
@@ -195,22 +204,33 @@ module control_unit(/* verilator lint_off UNUSED */
      			is_csr_o=1'b0;
      			is_trap_o=1'b0;
      			funct3_mem_o=instr[14:12];
+                is_mret_o=1'b0; 
      		end
 
      		is_alu: begin
 
      			ctrl_muxa_o=2'b0;
-     			if(is_alu_r)
-     				ctrl_muxb_o=1'b0;
-     			else 
-     				ctrl_muxb_o=1'b1;
+                //MUX B
+     			if(is_shift)
+     				ctrl_muxb_o=2'b10;
+     			else if (is_alu_r)
+     				ctrl_muxb_o=2'b0;
+                else if (is_alu_i)
+                    ctrl_muxb_o=2'b1; 
+                else 
+                    ctrl_muxb_o=2'b0;
+                //
+                if(is_shamt)
+                    type_imm_o=3'b110;
+                else
+     			    type_imm_o=3'b001;
 
-     			type_imm_o=3'b001;
      			is_LS_o=1'b0;
      			data_or_alu_o=1'b0;
      			we_wb_o=1'b1;     			
      			is_csr_o=1'b0;
      			is_trap_o=1'b0;
+                is_mret_o=1'b0; 
 
      			if(is_comp) begin
      				mux_wb_sel_o=2'b11;
@@ -235,6 +255,7 @@ module control_unit(/* verilator lint_off UNUSED */
      			we_wb_o=1'b0;
      			is_csr_o=1'b0;
      			is_trap_o=1'b0;
+                is_mret_o=1'b0; 
      		end
 
      		is_CSR: begin
@@ -250,22 +271,25 @@ module control_unit(/* verilator lint_off UNUSED */
      			csr_op_o = instr[13:12];
      			is_csr_o=1'b1;
      			is_trap_o=1'b0;
+                is_mret_o=1'b0; 
 
      		end
      		is_ecall: begin
      			is_trap_o=1'b1;
      			cause_trap_o=E_ECALL;
+                is_mret_o=1'b0; 
 
      		end
 
      		is_ebreak: begin
      			is_trap_o=1'b1;
-     			cause_trap_o=E_BREAKPOINT;     			
+     			cause_trap_o=E_BREAKPOINT;
+                is_mret_o=1'b0;      			
      		end
 
      		is_nop || is_fence : begin
      			ctrl_muxa_o=2'b0;
-     			ctrl_muxb_o=1'b1;
+     			ctrl_muxb_o=2'b1;
      			type_imm_o=3'b0;
      			is_LS_o=1'b0;
      			data_or_alu_o=1'b0;
@@ -273,6 +297,7 @@ module control_unit(/* verilator lint_off UNUSED */
      			we_wb_o=1'b0;
      			is_csr_o=1'b0;
      			is_trap_o=1'b0;
+                is_mret_o=1'b0; 
 
      		end
 
@@ -287,12 +312,13 @@ module control_unit(/* verilator lint_off UNUSED */
      		default: begin
      			is_trap_o=1'b1;
      			cause_trap_o=E_ILLEGAL_INST;
+                is_mret_o=1'b0; 
      		end
 
      	endcase
 
      	//Determine if a branch is taken.
-     	branch_taken_o = (is_beq & equal_i) | (is_bne & ~equal_i) | (is_bge & ~lts_i) | (is_bgeu & ~lts_i) | (is_blt & lts_i) | (is_bltu & ltu_i);
+     	branch_taken_o = (is_beq & equal_i) | (is_bne & ~equal_i) | (is_bge & ~lts_i) | (is_bgeu & ~ltu_i) | (is_blt & lts_i) | (is_bltu & ltu_i);
 
      	//PC control
      	if(PC_csr_i)
