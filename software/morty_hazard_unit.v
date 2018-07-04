@@ -15,6 +15,10 @@ module hazard_unit(//inputs
 				   input wire is_MEM, //Flag for LS instruction in process in MEM stage
 				   input wire is_IF, //Flag for instruction being fetched
 				   input wire is_trap, //Flag for any kind of exception
+				   input wire is_mret,
+				   input wire is_FW_ex,
+				   input wire is_FW_mem,
+				   input wire is_FW_wb,
 				   //Outputs
 				   output reg [1:0] FW1_o,  //FW to rs1
 				   output reg [1:0] FW2_o, //FW to rs2
@@ -35,33 +39,35 @@ module hazard_unit(//inputs
 	// EX = 01
 	// MEM = 10
 	//  WB = 11
-	always @(*) begin
-						//Forwarding for rs1
-						if(rd_ex_i!=0 & (rs1_id_i==rd_ex_i) )
-							FW1_o= 2'b01;
+	always @(*) begin									
 
-						else if(rd_mem_i!=0 & (rs1_id_i==rd_mem_i) )
-							FW1_o= 2'b10;
+			//Forwarding for rs1
+			if(is_FW_ex & rd_ex_i!=0 & (rs1_id_i==rd_ex_i) )
+				FW1_o= 2'b01;
 
-						else if(rd_wb_i!=0 & (rs1_id_i==rd_wb_i) )
-							FW1_o= 2'b11;
+			else if(is_FW_mem & rd_mem_i!=0 & (rs1_id_i==rd_mem_i) )
+				FW1_o= 2'b10;
 
-						else 
-							FW1_o=2'b00;	
+			else if(is_FW_wb & rd_wb_i!=0 & (rs1_id_i==rd_wb_i) )
+				FW1_o= 2'b11;
 
-						//Forwarding for rs2
-						if(rd_ex_i!=0 & (rs2_id_i==rd_ex_i) )
-							FW2_o= 2'b01;
+			else 
+				FW1_o=2'b00;	
 
-						else if(rd_mem_i!=0 & (rs2_id_i==rd_mem_i) )
-							FW2_o= 2'b10;
+			//Forwarding for rs2
+			if(is_FW_ex & rd_ex_i!=0 & (rs2_id_i==rd_ex_i) )
+				FW2_o= 2'b01;
 
-						else if(rd_wb_i!=0 & (rs2_id_i==rd_wb_i) )
-							FW2_o= 2'b11;
+			else if(is_FW_mem & rd_mem_i!=0 & (rs2_id_i==rd_mem_i) )
+				FW2_o= 2'b10;
 
-						else 
-							FW2_o=2'b00;
-				end
+			else if(is_FW_wb & rd_wb_i!=0 & (rs2_id_i==rd_wb_i) )
+				FW2_o= 2'b11;
+
+			else 
+				FW2_o=2'b00;					
+							
+		end
 
 	//en= 1  reg activated
 	//en= 0 reg desactivated
@@ -71,7 +77,7 @@ module hazard_unit(//inputs
 		//Stalls
 		always @(*) begin
 
-						if(is_trap) begin  //An exception happens
+						if(is_trap | is_mret) begin  //An exception happens
 							en_o= 4'b1111;
 							clear_o= 4'b1111;
 							pc_en_o=1'b1;
@@ -110,7 +116,7 @@ module hazard_unit(//inputs
 						else if(is_IF) begin   //Instruction being fetched
 							en_o= 4'b1111;
 							clear_o= 4'b1000;
-							pc_en_o=1'b1;							
+							pc_en_o=1'b0;							
 
 						end
 						
@@ -121,3 +127,4 @@ module hazard_unit(//inputs
 							end
 					end
 endmodule
+
