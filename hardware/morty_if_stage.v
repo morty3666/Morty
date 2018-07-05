@@ -13,22 +13,16 @@ module morty_if_stage #(
 		input  		if_stall,
 		input 		if_flush,
 		input 		id_stall,
-		input 		id_bubble,
-		// LSU => IF
+		input 		id_flush,
 		input  [31:0]	if_instruction_i,
-		// IF => LSU
-		output [31:0]	if_pc_o,
-		//PC SOURCE PC's
 		input  [31:0]	pc_branch_address_i,
 		input  [31:0] 	pc_jump_address_i,
 		input  [31:0]	exception_pc_i,
-		//CONTROL => IF
 		input  [ 1:0] 	if_pc_sel_i,
 		input 		if_inst_access_fault_i,
-		// IF => ID 
+		output [31:0]	if_pc_o,
 		output [31:0] 	id_instruction_o,
 		output [31:0] 	id_pc_o,
-		// if_* references the stage the exception occured on
 		output [ 3:0]	if_exception_o,
 		output [31:0]	if_exc_data_o,
 		output 		if_trap_valid_o	); 
@@ -48,16 +42,15 @@ module morty_if_stage #(
 	assign		if_exception 	= (if_inst_access_fault_i)? INST_ACCESS_FAULT : ((addr_misaligned)? INST_ADDR_MISALIGNED: 4'b0);
 
 	morty_pc_reg  #(.RESET_ADDR(RESET_ADDR))
-			PC_REG( .clk_i(clk_i),
+			PC_REG(.clk_i(clk_i),
 				.rst_i(rst_i),
 				.stall(if_stall),
-				.flush(if_bubble),
+				.flush(if_flush),
 				.pc_i(if_pc_mux),
 				.pc_o(if_pc_o) );
-	morty_add       PC_ADD   (
-				.in1(if_pc_o),
-				.in2(4),
-				.out(if_pc_add4));
+	morty_pc_add PC_ADD   (
+				.pc(if_pc_o),
+				.pc_next(if_pc_add4));
 
 	morty_pc_source PC_SOURCE(
 				.in0(if_pc_add4),
@@ -72,7 +65,7 @@ module morty_if_stage #(
 				.clk(clk_i),
 				.rst(rst_i),
 				.id_stall(id_stall),
-				.id_bubble(id_bubble),
+				.id_flush(id_flush),
 				.if_pc(if_pc_o),
 				.if_exception_i(if_exception),
 				.if_trap_valid(trap_valid),

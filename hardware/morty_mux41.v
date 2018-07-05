@@ -1,7 +1,6 @@
 
 
 module morty_mux41 (
-
 		input 	[31:0] in_0,
 		input 	[31:0] in_1,
 		input   [31:0] in_2,

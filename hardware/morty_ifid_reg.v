@@ -2,7 +2,7 @@
 module morty_ifid_reg (
 			input 			clk,
 			input 			rst,
-			input 			id_bubble,
+			input 			id_flush,
 			input 			id_stall,
 			input 		[31:0]	if_pc,
 			input 		[ 3:0]	if_exception_i,
@@ -17,11 +17,11 @@ module morty_ifid_reg (
 
 		
 		always 	@(posedge clk) begin
-			id_pc  	       	<= ((rst|id_bubble)? 32'b0  :((id_stall)? id_pc   : if_pc ));  
-			id_inst        	<= ((rst|id_bubble)? 32'h33 :((id_stall)? id_inst : if_inst)); 
-			if_exception_o 	<= ((rst|id_bubble)? 4'b0   :((id_stall)? if_exception_o : if_exception_i)); 
-			id_trap_valid	<= ((rst|id_bubble)? 1'b0   :((id_stall)? id_trap_valid : if_trap_valid)); 
-			id_exc_data	<= ((rst|id_bubble)? 32'b0  :((id_stall)? id_exc_data : if_exc_data)); 
+			id_pc  	       	<= ((rst|id_flush)? 32'b0  :((id_stall)? id_pc   : if_pc ));  
+			id_inst        	<= ((rst|id_flush)? 32'h33 :((id_stall)? id_inst : if_inst)); 
+			if_exception_o 	<= ((rst|id_flush)? 4'b0   :((id_stall)? if_exception_o : if_exception_i)); 
+			id_trap_valid	<= ((rst|id_flush)? 1'b0   :((id_stall)? id_trap_valid : if_trap_valid)); 
+			id_exc_data	<= ((rst|id_flush)? 32'b0  :((id_stall)? id_exc_data : if_exc_data)); 
 		end
 endmodule
 

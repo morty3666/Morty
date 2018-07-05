@@ -1,38 +1,48 @@
 
-`timescale 1 ns / 1 ps
-module morty_core #(
-		parameter [31:0] HART_ID = 0,
-		parameter [31:0] RESET_ADDR = 32'h0000_0000,
-		parameter [0:0]  ENABLE_COUNTERS = 1,
-		parameter [0:0]	 ENABLE_M_ISA = 0,
-		parameter 	 UCONTROL = "ucontrol.list" 
-		)(
-		input 		clk_i,
-		input 		rst_i,
-		//INSTRUCTION MEMORY PORT
-		output	[31:0]	iwbm_addr_o,
-		output 		iwbm_cyc_o,
-		output 		iwbm_stb_o,
-		input	[31:0]	iwbm_dat_i,
-		input		iwbm_err_i,
-		input 		iwbm_ack_i,
-		//DATA MEMORY PORT
-		input	[31:0]	dwbm_dat_i,
-		input		dwbm_err_i,
-		input 		dwbm_ack_i,
-		output	[31:0]	dwbm_addr_o,
-		output 		dwbm_cyc_o,
-		output 		dwbm_stb_o,
-		output 	[31:0]	dwbm_dat_o,
-		output		dwbm_we_o,
-		output	[ 3:0]	dwbm_sel_o,
-		//INTERRUPTIONS
-		/*verilator lint_off UNUSED */
-		input 		xint_meip_i,
-		input		xint_mtip_i,
-		input		xint_msip_i 
-		/*verilator lint_on UNUSED */
-	); 	
+//`include "./if_stage.v"
+//`include "./id_stage.v"
+	//`include "./ex_stage.v"
+	//`include "./mem_stage.v"
+	//`include "./lsu.v"
+	//`include "./forwarding_unit.v"
+	//`include "./control_unit.v"
+
+	`timescale 1 ns / 1 ps
+
+
+	module morty_core #(
+			parameter [31:0] HART_ID = 0,
+			parameter [31:0] RESET_ADDR = 32'h0000_0000,
+			parameter [0:0]  ENABLE_COUNTERS = 1,
+			parameter [0:0]	 ENABLE_M_ISA = 0,
+			parameter 	 UCONTROL = "ucontrol.list" 
+			)(
+			input 		clk_i,
+			input 		rst_i,
+			//INSTRUCTION MEMORY PORT
+			output	[31:0]	iwbm_addr_o,
+			output 		iwbm_cyc_o,
+			output 		iwbm_stb_o,
+			input	[31:0]	iwbm_dat_i,
+			input		iwbm_err_i,
+			input 		iwbm_ack_i,
+			//DATA MEMORY PORT
+			input	[31:0]	dwbm_dat_i,
+			input		dwbm_err_i,
+			input 		dwbm_ack_i,
+			output	[31:0]	dwbm_addr_o,
+			output 		dwbm_cyc_o,
+			output 		dwbm_stb_o,
+			output 	[31:0]	dwbm_dat_o,
+			output		dwbm_we_o,
+			output	[ 3:0]	dwbm_sel_o,
+			//INTERRUPTIONS
+			/*verilator lint_off UNUSED */
+			input 		xint_meip_i,
+			input		xint_mtip_i,
+			input		xint_msip_i 
+			/*verilator lint_on UNUSED */
+		); 	
 
 
 		//IF STAGE SIGNALS 
@@ -53,7 +63,7 @@ module morty_core #(
 		wire	[ 4:0]	wb_waddr;
 		wire		wb_we;
 		wire		id_stall;
-		wire 		id_bubble;
+		wire 		id_flush;
 		wire 	[31:0]	ex_fwd_drd;
 		wire 	[31:0]	mem_fwd_drd;
 		wire	[ 1:0]	forward_a_sel;
@@ -71,6 +81,7 @@ module morty_core #(
 		wire 	[31:0]	pc_jump_addr; 
 		wire 	[31:0]	pc_branch_addr;
 		wire 		take_branch;
+		wire 		take_jump;
 		wire 	[31:0]	ex_pc;
 		wire 	[31:0]	ex_instruction;
 		wire 	[31:0]	ex_port_a;
@@ -87,7 +98,7 @@ module morty_core #(
 		//EX STAGE 	
 		//+IN
 		wire 		ex_stall;
-		wire 		ex_bubble;
+		wire 		ex_flush;
 		wire 		ex_fence_op;
 		wire 		ex_xret_op;
 		wire 	[31:0]	ex_store_data;
@@ -121,7 +132,7 @@ module morty_core #(
 		//MEM STAGE 
 		//+IN 
 		wire 		mem_stall;
-		wire 		mem_bubble; 
+		wire 		mem_flush; 
 		wire 	[31:0]	mem_store_data;
 		wire 	[31:0]	mem_load_data;
 		wire 		mem_fence_op;
@@ -131,7 +142,7 @@ module morty_core #(
 		
 		/* verilator lint_off UNUSED */ 
 		wire 		wb_stall;
-		wire 		wb_bubble;
+		wire 		wb_flush;
 		wire 	[31:0]	wb_result_mem;
 		wire 	[31:0]	wb_pc;
 		wire 	[31:0]	wb_instruction;
@@ -150,11 +161,12 @@ module morty_core #(
 		wire 		ld_dependence;
 
 		//control signals
-		wire		jump_bubble_req;
-		wire 		branch_bubble_req;
+		wire		jump_flush_req;
+		wire 		branch_flush_req;
 		wire		if_stall_req;
 		wire 		mem_stall_req;
 		wire 		fwd_stall_req;
+		wire 		ex_nop;
 		wire 		if_kill;
 		wire 		illegal_stall_req;
 
@@ -170,27 +182,9 @@ module morty_core #(
 		wire 		exception_stall_req;
 		wire 		exception_sel_flag;
 		wire 	[31:0]	csr_data_o;	
-		wire 	[1:0]	imm_sel;
-		wire 	[3:0]	alu_op;
-		wire 	[2:0]	comparator_sel;
-		wire 	[2:0]	csr_op;
-		wire 		csr_sel;
-		wire 		jump_sel;
-		wire 		shift_sel;
-		wire 		mem_op;
-		wire 	[1:0]	port_a_sel;
-		wire 	[1:0]	port_b_sel;
-		wire 	[5:0]	mem_flags;
-		wire 		break_op;
-		wire 		xcall_op;
-		wire 		fence_op;
-		wire 		xret_op;
-		wire 		id_we;
-		wire 		illegal_inst;
-	
 
-		assign branch_bubble_req = take_branch;
-		assign jump_bubble_req 	= take_jump;
+		assign branch_flush_req = take_branch;
+		assign jump_flush_req 	= take_jump;
 		assign fwd_stall_req  	= ld_dependence; 
 
 		morty_if_stage #(
@@ -203,7 +197,8 @@ module morty_core #(
 				.if_stall(if_stall & ~if_kill & ~wb_trap_valid),
 				.if_flush(if_flush),
 				.id_stall(id_stall),
-				.id_bubble(id_bubble),
+				.id_flush(id_flush),
+				.if_pc_sel_i(if_pc_sel),
 				//----------------------------------
 				// LSU => IF
 				.if_instruction_i(if_instruction),
@@ -212,7 +207,6 @@ module morty_core #(
 				.pc_branch_address_i(pc_branch_addr),
 				.pc_jump_address_i(pc_jump_addr),
 				.exception_pc_i(exception_pc),
-				.if_pc_sel_i(if_pc_sel),
 				.if_inst_access_fault_i(iwbm_err_i), 
 				//----------------------------------
 				//----------------------------------
@@ -232,7 +226,7 @@ module morty_core #(
 				.rst_i(rst_i),
 				// ID <= CONTROL
 				.ex_stall_i(ex_stall),
-				.ex_bubble_i(ex_bubble),
+				.ex_flush_i(ex_flush | ex_nop),
 				//--------------------------------------
 				// ID <= IF
 				.id_pc_i(id_pc),
@@ -253,27 +247,12 @@ module morty_core #(
 				// ID => FORWARDING UNIT
 				.id_rs1_o(id_rs1),
 				.id_rs2_o(id_rs2),
-				//CONTROL SIGNALS 
-				.csr_op_i(csr_op),
-				.csr_sel_i(csr_sel),
-				.jump_sel_i(jump_sel),
-				.comparator_sel_i(comparator_sel),
-				.alu_op_i(alu_op),
-				.shift_sel_i(shift_sel),
-				.mem_op_i(mem_op),
-				.port_a_sel_i(port_a_sel),
-				.port_b_sel_i(port_b_sel),
-				.mem_flags_i(mem_flags),
-				.imm_sel_i(imm_sel),
-				.break_op_i(break_op),
-				.xcall_op_i(xcall_op),
-				.fence_op_i(fence_op),
-				.xret_i(xret_op),
-				.we_i(id_we),
 				//---------------------------------------
 				// ID => IF & CONTROL (JUMPS)
 				.pc_branch_address_o(pc_branch_addr),
 				.pc_jump_address_o(pc_jump_addr),    
+				.take_branch_o(take_branch),	     
+				.take_jump_o(take_jump),
 				.id_exception_o(id_exception),
 				.id_trap_valid_o(id_trap_valid),
 				//---------------------------------------
@@ -283,8 +262,7 @@ module morty_core #(
 				.if_exc_data_i(if_exc_data),
 				.if_trap_valid_i(if_trap_valid),
 				//---------------------------------------
-				// OUTPUT
-				.take_branch_o(take_branch),
+				// OUTPUTS
 				.ex_pc_o(ex_pc),
 				.ex_instruction_o(ex_instruction),
 				.ex_port_a_o(ex_port_a),
@@ -296,15 +274,10 @@ module morty_core #(
 				.ex_we_o(ex_we),
 				.ex_mem_flags_o(ex_mem_flags),
 				.ex_mem_ex_sel_o(ex_mem_ex_sel),
-				// ID EXCEPTIONS SIGNALS
-				.id_exception_o(id_exception),
-				.id_exc_data_o(id_exc_data),
-				.id_trap_valid_o(id_trap_valid),
-				// ID => EX exception signals
+				//EXCEPTIONS SIGNALS
 				.ex_exception_o(ex_exception),
 				.ex_exc_data_o(ex_exc_data),
 				.ex_trap_valid_o(ex_trap_valid),
-				//-----------------------------
 				.ex_fence_op_o(ex_fence_op),
 				.ex_xret_op_o(ex_xret_op),
 				//CSR SIGNALS
@@ -320,7 +293,7 @@ module morty_core #(
 				.rst_i(rst_i),
 				// CONTROL => ID 
 				.mem_stall_i(mem_stall),
-				.mem_bubble_i(mem_bubble),
+				.mem_flush_i(mem_flush),
 				// ID => EX
 				.ex_pc_i(ex_pc),
 				.ex_instruction_i(ex_instruction),
@@ -371,7 +344,7 @@ module morty_core #(
 				.rst_i(rst_i),
 				//CONTROL => MEM
 				.wb_stall(wb_stall),
-				.wb_bubble(wb_bubble),
+				.wb_flush(wb_flush),
 				//-----------------------------------------
 				//MEM => FORWARDING UNIT
 				.forward_mem_dat_o(mem_fwd_drd),
@@ -514,13 +487,8 @@ module morty_core #(
 				.ld_stall_req_o(ld_stall_req),
 				.xcall_break_stall_req_o(xcall_break_stall_req)); 
 
-
-
-
 		morty_control_unit CU (
 				.rst_i(rst_i),
-				//PIPELINE CONTROL INPUT SIGNALS
-				.take_branch_i(take_branch),
 				.if_pc_sel_o(if_pc_sel),
 				.if_stall_req_i(if_stall_req),
 				.mem_stall_req_i(mem_stall_req),
@@ -528,50 +496,21 @@ module morty_core #(
 				.ld_stall_req_i(ld_stall_req),
 				.illegal_stall_req_i(illegal_stall_req),
 				.xcall_break_stall_req_i(xcall_break_stall_req),
-				.branch_bubble_req_i(branch_bubble_req),
-				.jump_bubble_req_i(jump_bubble_req),
+				.branch_flush_req_i(branch_flush_req),
+				.jump_flush_req_i(jump_flush_req),
 				.exception_stall_req_i(exception_stall_req),
-				//----------------------------------------------
-				.opcode(id_instruction[6:0]),
-				.func3(id_instruction[14:12]),
-				.func7(id_instruction[31:25]),
-				.instruction(id_intruction),
-				//CONTROL SIGNALS OUTPUTS
-				// CONTROL => ID
-				//
-				.imm_sel_o(imm_sel),
-				.alu_op_o(alu_op),
-				.comparator_sel_o(comparator_sel),
-				.csr_op_o(csr_op),
-				.csr_sel_o(csr_sel),
-				.jump_sel_o(jump_sel),
-				.shift_sel_o(shift_sel),
-				.mem_op_o(mem_op),
-				.port_a_sel_o(port_a_sel),
-				.port_b_sel_o(port_b_sel),
-				.mem_flags_o(mem_flags),
-				.break_op_o(break_op),
-				.xcall_op_o(xcall_op),
-				.fence_op_o(fence_op),
-				.xret_op_o(xret_op),
-				.we_o(id_we),
-				.illegal_inst_o(illegal_inst),
-				// STALLS 
 				.if_stall_o(if_stall),
 				.id_stall_o(id_stall),
 				.ex_stall_o(ex_stall),
 				.mem_stall_o(mem_stall),
 				.wb_stall_o(wb_stall),
-				//----------------------------------------------
-				.if_kill_o(if_kill), // signal for killing fetch pc if jumps occure
-				// BUBBLES 
-				.if_bubble_o(if_flush),
-				.id_bubble_o(id_bubble),
-				.ex_bubble_o(ex_bubble),
-				.mem_bubble_o(mem_bubble),
-				.wb_bubble_o(wb_bubble) 		
-				//-----------------------------------------------
-			); 
+				.if_kill_o(if_kill),
+				.if_flush_o(if_flush),
+				.id_flush_o(id_flush),
+				.ex_flush_o(ex_flush),
+				.mem_flush_o(mem_flush),
+				.wb_flush_o(wb_flush),
+				.ex_nop_o(ex_nop) 		); 
 
 		morty_csr_exception_unit # (	
 			

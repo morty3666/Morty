@@ -4,7 +4,7 @@ module morty_mem_stage(
 		  input 		clk_i, 
 		  input 		rst_i,
 		  input 		wb_stall,
-		  input 		wb_bubble,
+		  input 		wb_flush,
 		  //MEM => ID FORWARDING 
 		  output 	[31:0] forward_mem_dat_o,
 	          //EX => MEM SIGNALS 
@@ -118,20 +118,20 @@ module morty_mem_stage(
 
 
 	always @(posedge clk_i) begin
-	wb_pc_o 		  <= (rst_i | wb_bubble) ? 32'h0  : ((wb_stall)? wb_pc_o 			: mem_pc_i); 
-	wb_instruction_o 	  <= (rst_i | wb_bubble) ? 32'h33 : ((wb_stall)? wb_instruction_o 		: mem_instruction_i); 
-	wb_result_o 		  <= (rst_i | wb_bubble) ? 32'h0  : ((wb_stall)? wb_result_o 			: mem_result); 
-	wb_rs1_o 		  <= (rst_i | wb_bubble) ? 5'h0   : ((wb_stall)? wb_rs1_o 			: mem_rs1_i); 
-	wb_waddr_o 		  <= (rst_i | wb_bubble) ? 5'h0   : ((wb_stall)? wb_waddr_o 			: mem_waddr_i); 
-	wb_we_o 		  <= (rst_i | wb_bubble) ? 1'h0   : ((wb_stall)? wb_we_o 			: mem_we_i); 
-	wb_exception_o 		  <= (rst_i | wb_bubble) ? 4'h0   : ((wb_stall)? wb_exception_o 			: mem_exception); 
-	wb_exc_data_o 		  <= (rst_i | wb_bubble) ? 32'h0  : ((wb_stall)? wb_exc_data_o 			: mem_exc_data); 
-	wb_trap_valid_o		  <= (rst_i | wb_bubble) ? 1'h0   : ((wb_stall)? wb_trap_valid_o			: mem_trap_valid); 
-	wb_csr_data_o 		  <= (rst_i | wb_bubble) ? 32'h0  : ((wb_stall)? wb_csr_data_o 			: mem_csr_data_i); 
-	wb_csr_addr_o 		  <= (rst_i | wb_bubble) ? 12'h0  : ((wb_stall)? wb_csr_addr_o 			: mem_csr_addr_i); 
-	wb_csr_op_o 		  <= (rst_i | wb_bubble) ? 3'h0   : ((wb_stall)? wb_csr_op_o 			: mem_csr_op_i); 
-	wb_fence_op_o	 	  <= (rst_i | wb_bubble) ? 1'h0   : ((wb_stall)? wb_fence_op_o 			: mem_fence_op_i); 
-	wb_xret_op_o	 	  <= (rst_i | wb_bubble) ? 1'h0   : ((wb_stall)? wb_xret_op_o 			: mem_xret_op_i); 
+	wb_pc_o 		  <= (rst_i | wb_flush) ? 32'h0  : ((wb_stall)? wb_pc_o 			: mem_pc_i); 
+	wb_instruction_o 	  <= (rst_i | wb_flush) ? 32'h33 : ((wb_stall)? wb_instruction_o 		: mem_instruction_i); 
+	wb_result_o 		  <= (rst_i | wb_flush) ? 32'h0  : ((wb_stall)? wb_result_o 			: mem_result); 
+	wb_rs1_o 		  <= (rst_i | wb_flush) ? 5'h0   : ((wb_stall)? wb_rs1_o 			: mem_rs1_i); 
+	wb_waddr_o 		  <= (rst_i | wb_flush) ? 5'h0   : ((wb_stall)? wb_waddr_o 			: mem_waddr_i); 
+	wb_we_o 		  <= (rst_i | wb_flush) ? 1'h0   : ((wb_stall)? wb_we_o 			: mem_we_i); 
+	wb_exception_o 		  <= (rst_i | wb_flush) ? 4'h0   : ((wb_stall)? wb_exception_o 			: mem_exception); 
+	wb_exc_data_o 		  <= (rst_i | wb_flush) ? 32'h0  : ((wb_stall)? wb_exc_data_o 			: mem_exc_data); 
+	wb_trap_valid_o		  <= (rst_i | wb_flush) ? 1'h0   : ((wb_stall)? wb_trap_valid_o			: mem_trap_valid); 
+	wb_csr_data_o 		  <= (rst_i | wb_flush) ? 32'h0  : ((wb_stall)? wb_csr_data_o 			: mem_csr_data_i); 
+	wb_csr_addr_o 		  <= (rst_i | wb_flush) ? 12'h0  : ((wb_stall)? wb_csr_addr_o 			: mem_csr_addr_i); 
+	wb_csr_op_o 		  <= (rst_i | wb_flush) ? 3'h0   : ((wb_stall)? wb_csr_op_o 			: mem_csr_op_i); 
+	wb_fence_op_o	 	  <= (rst_i | wb_flush) ? 1'h0   : ((wb_stall)? wb_fence_op_o 			: mem_fence_op_i); 
+	wb_xret_op_o	 	  <= (rst_i | wb_flush) ? 1'h0   : ((wb_stall)? wb_xret_op_o 			: mem_xret_op_i); 
 	end	
 
 endmodule 
