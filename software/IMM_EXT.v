@@ -1,5 +1,3 @@
-
-
 module IMM_EXT(
 				input [31:7] inst,
 				input [2:0] type_imm, //Señal de control
