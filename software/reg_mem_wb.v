@@ -14,6 +14,7 @@ module reg_mem_wb ( input wire clk_i,
 					input wire		  is_trap_mem,      
 					input wire 		  is_rs0_mem,
 					input wire [31:0] data_wb_mem,
+					input wire	[31:0] addr_misa_mem,
 					//control
 					input wire  we_wb_mem,
 		  		    input wire  [1:0] mux_wb_sel_mem,
@@ -34,6 +35,7 @@ module reg_mem_wb ( input wire clk_i,
 					output reg		  is_trap_wb,      
 					output reg 		  is_rs0_wb,
 					output reg [31:0] data_wb_wb,
+					output reg 	[31:0] addr_misa_wb,
 					//control
 					output reg  we_wb_wb,
 		  		    output reg  [1:0] mux_wb_sel_wb,
@@ -67,6 +69,7 @@ module reg_mem_wb ( input wire clk_i,
   		    is_mret_wb	<= 1'b0;
   		    is_FW_wb <= 1'b0;
   		    is_comp_wb <= 1'b0;
+  		    addr_misa_wb <= 32'b0;
   			
   		end
   		else if (clear) begin
@@ -89,6 +92,7 @@ module reg_mem_wb ( input wire clk_i,
 			is_trap_wb <= is_trap_mem;
 			is_FW_wb <= 1'b0;
 			is_comp_wb <= 1'b0;
+			addr_misa_wb <= addr_misa_mem;
   		    
            
   		end 		
@@ -115,6 +119,7 @@ module reg_mem_wb ( input wire clk_i,
 	  		     is_mret_wb	<= is_mret_mem;
 	  		     is_FW_wb <= is_FW_mem;
 	  		     is_comp_wb <= is_comp_mem;
+	  		     addr_misa_wb <= addr_misa_mem;
   				
   			end
   			else begin
@@ -136,10 +141,12 @@ module reg_mem_wb ( input wire clk_i,
 	  		     is_mret_wb	<= is_mret_wb;
 	  		     is_FW_wb <= is_FW_wb;
 	  		     is_comp_wb <= is_comp_wb;
+	  		     addr_misa_wb <= addr_misa_wb;
   			end
   			  			
   		end
   	end
 
   	endmodule
+
 
