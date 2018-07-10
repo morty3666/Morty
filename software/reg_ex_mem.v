@@ -1,6 +1,5 @@
 //Reg EX MEM
 
-
  module reg_ex_mem( input wire clk_i,
   					input wire rst_i,
   					input wire clear,
