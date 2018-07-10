@@ -24,7 +24,8 @@ module hazard_unit(//inputs
 				   output reg [1:0] FW2_o, //FW to rs2
 				   output reg [3:0] en_o,  //Enable for registers between stages
 				   output reg [3:0] clear_o, //Reset for registers between stages 
-				   output reg pc_en_o  //PC enable
+				   output reg pc_en_o,  //PC enable
+				   output reg is_stallx
 				   );
 
 
@@ -81,42 +82,49 @@ module hazard_unit(//inputs
 							en_o= 4'b1111;
 							clear_o= 4'b1111;
 							pc_en_o=1'b1;
+							is_stallx = 1'b0;
 						end								
 
 						else if(is_MEM) begin //MEM stage processing a LS instruction
 							en_o= 4'b0001;
 							clear_o= 4'b0001;
 							pc_en_o=1'b0;
+							is_stallx = 1'b0;
 						end
 
 						else if((opcode_ex_i== load | opcode_ex_i== CSR) & (rd_ex_i!=0 & (rs1_id_i==rd_ex_i | rs2_id_i==rd_ex_i ))) begin //load or CSR instruction
 							en_o= 4'b0111;
 							clear_o= 4'b0100;
 							pc_en_o=1'b0;
+							is_stallx = 1'b1;
 						end
 
 						else if(opcode_mem_i== CSR & (rd_mem_i!=0 & (rs1_id_i==rd_mem_i | rs2_id_i==rd_mem_i ))) begin //CSR instruction
 							en_o= 4'b0111;
 							clear_o= 4'b0100;
 							pc_en_o=1'b0;
+							is_stallx = 1'b1;
 						end
 
 						else if(opcode_id_i== JAL | opcode_id_i== JALR) begin //J instruction
 							en_o= 4'b1111;
 							clear_o= 4'b1000;
 							pc_en_o=1'b1;
+							is_stallx = 1'b0;
 						end
 
 						else if(opcode_id_i== branch & is_branch) begin //branch instruction
 							en_o= 4'b1111;
 							clear_o= 4'b1000;
 							pc_en_o=1'b1;
+							is_stallx = 1'b0;
 						end
 
 						else if(is_IF) begin   //Instruction being fetched
 							en_o= 4'b1111;
 							clear_o= 4'b1000;
-							pc_en_o=1'b0;							
+							pc_en_o=1'b0;
+							is_stallx = 1'b0;							
 
 						end
 						
@@ -124,6 +132,7 @@ module hazard_unit(//inputs
 							en_o= 4'b1111;
 							clear_o= 4'b0000;
 							pc_en_o=1'b1;
+							is_stallx = 1'b0;
 							end
 					end
 endmodule
