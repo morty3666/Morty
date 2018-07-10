@@ -29,8 +29,15 @@
   			is_trap_id <= 1'b0;
   			
   		end
-  		else if (clear) 
-  			instr_id <= 32'b0;  		
+  		else if (clear) begin
+            instr_id <= 32'b0; 
+            trap_code_id <= trap_code_if;
+            is_trap_id <= is_trap_if;
+            PC4_id <= PC4_if;
+            PC_id <= PC_if;
+            
+        end
+  			 		
 
   		else begin
 
@@ -54,6 +61,7 @@
   	end
 
   	endmodule
+
 
 
 
