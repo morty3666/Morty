@@ -49,6 +49,12 @@ module MEM_stage(   //inputs
 		localparam SB=3'b000;
 		localparam SH=3'b001;
 		localparam SW=3'b010;
+		localparam LHU=3'b101;
+		//
+		localparam E_LOAD_ADDR_MISALIGNED      = 4'd4;
+	    localparam E_LOAD_ACCESS_FAULT         = 4'd5;
+	    localparam E_STORE_AMO_ADDR_MISALIGNED = 4'd6;
+	    localparam E_STORE_AMO_ACCESS_FAULT    = 4'd7;
 	
 
 		always @(*) begin
@@ -59,38 +65,72 @@ module MEM_stage(   //inputs
 				rd_mem_o =  rd_mem_i;
 				csr_data_mem_o = csr_data_mem_i;  
 				csr_addr_mem_o = csr_addr_mem_i;  
-			    trap_code_mem_o = trap_code_mem_i;  
-				is_trap_mem_o = is_trap_mem_i;
+			    //trap_code_mem_o = trap_code_mem_i;  
+				//is_trap_mem_o = is_trap_mem_i;
 				is_rs0_o=is_rs0_i;
 
 				//Signals to memory
 				wbm_addr_mem_o= {alu_out_mem_i[31:2], 2'b0};
-				wbm_dat_mem_o = rs2_data_mem_i;
-				wbm_we_mem_o = we_mem_ctrl_i;
+				wbm_we_mem_o = we_mem_ctrl_i & ~is_misaligned_S;
+
+
+				if(is_misaligned_S) begin
+					trap_code_mem_o = E_STORE_AMO_ADDR_MISALIGNED;  
+					is_trap_mem_o = 1'b1;
+					
+				end
+				else if(is_misaligned_L) begin
+					trap_code_mem_o = E_LOAD_ADDR_MISALIGNED ;  
+					is_trap_mem_o = 1'b1;
+				end
+				else begin
+					trap_code_mem_o = trap_code_mem_i;  
+					is_trap_mem_o = is_trap_mem_i;
+				end
 			
 		end
-		/* 
+
+		wire is_misaligned_S;
+		wire is_misaligned_L;
+		
 
 		always @(*) begin
-			case(1'b1)
-				SB: begin
-					case(alu_out_mem_i[1:0])
-						2'b00: wbm_dat_mem_o = rs2_data_mem_i;
-						2'b01: wbm_dat_mem_o = {rs2_data_mem_i[23:0], 8'b0};
-						2'b10: wbm_dat_mem_o = {rs2_data_mem_i[15:0], 16'b0};
-						2'b11: wbm_dat_mem_o = {rs2_data_mem_i[31:24], 24'b0};
-					endcase
-				end
-				SH: begin
-					case(alu_out_mem_i[1])
-						1'b0: wbm_dat_mem_o = rs2_data_mem_i;
-						1'b1: wbm_dat_mem_o = {rs2_data_mem_i[15:0], 16'b0};
-					endcase					
-				end
+
+			case(funct3_mem_ctrl_i)
+				SB: wbm_dat_mem_o = {4{rs2_data_mem_i[7:0]}};				
+				SH: wbm_dat_mem_o = {2{rs2_data_mem_i[15:0]}};
 				default: wbm_dat_mem_o = rs2_data_mem_i;
-			endcase
-			
-		end   */
+			endcase	
+
+			//Misaaligned flag
+			if(is_LS_mem_ctrl_i & we_mem_ctrl_i) begin
+
+				case(funct3_mem_ctrl_i)	
+				SW: is_misaligned_S = alu_out_mem_i[1] | alu_out_mem_i[0];					
+				SH: is_misaligned_S = alu_out_mem_i[0];
+				default: is_misaligned_S = 1'b0;
+			endcase	
+				is_misaligned_L=1'b0;
+
+			end
+			else if(is_LS_mem_ctrl_i & ~we_mem_ctrl_i) begin
+
+				case(funct3_mem_ctrl_i)	
+				SW: is_misaligned_L = alu_out_mem_i[1] | alu_out_mem_i[0];					
+				SH: is_misaligned_L = alu_out_mem_i[0];
+				LHU: is_misaligned_L = alu_out_mem_i[0];
+				default: is_misaligned_L = 1'b0;
+			endcase	
+				is_misaligned_S=1'b0;
+				
+			end
+
+			else begin
+				is_misaligned_S=1'b0;
+				is_misaligned_L=1'b0;				
+			end
+
+		end   
 
 
 		 wire [31:0] data_mem_chosen;  //Correct data from memory (LB,LH,LW...)
@@ -102,7 +142,5 @@ module MEM_stage(   //inputs
 		 assign data_or_alu_o = data_or_alu_ctrl_i ? data_mem_chosen : alu_out_mem_i ;  //MUX choose between alu result or data from memory
 
 	 endmodule
-
-
 
 		
