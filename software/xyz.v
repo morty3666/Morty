@@ -55,6 +55,7 @@
   			 wire [31:0]  PC_if, PC4_if;
   			 wire  is_trap_if;
   			 wire [3:0]  trap_code_if;
+             wire       is_trap_taken;
              //--------------------------------------------------------------------------------------------------------------------------
   			 //ID signals
 			 wire [31:0] instr_id;
@@ -124,7 +125,9 @@
 			wire [3:0] trap_code_mem_o;   
 			wire		  is_trap_mem_o;     
 			wire 		  is_rs0_mem_o;
-			wire [31:0]   data_wb_mem;   
+			wire [31:0]   data_wb_mem; 
+            wire  [31:0]          addr_misa_mem; 
+            assign addr_misa_mem = alu_out_mem_i;
             //--------------------------------------------------------------------------------------------------------------------------
   			 //WB signals
 
@@ -142,6 +145,7 @@
 			wire [4:0] rd_wb_o; 		
 			 wire is_PC_csr;
              wire [31:0] CSR_data_out;
+              wire  [31:0]          addr_misa_wb;
 			 assign is_PC_csr = is_trap_wb_o | is_mret_wb;
              //--------------------------------------------------------------------------------------------------------------------------	
 
@@ -155,6 +159,7 @@
 			 wire [31:0] fwb; 
 			 wire [1:0] ctrl_forwa; //SEL MUX FW1
 			 wire [1:0] ctrl_forwb; //SEL MUX FW2
+       wire       is_stallx;
              //--------------------------------------------------------------------------------------------------------------------------
              //forwarding
              always @(*) begin
@@ -240,7 +245,7 @@
 			 
 			 //Regs between stages
 			 wire rst1, rst2, rst3, rst4;
-			 assign rst1 = rst_i | rst_stages[3];
+			 assign rst1 = rst_i | rst_stages[3] | is_trap_taken;
 			 assign rst2 = rst_i | rst_stages[2];
 			 assign rst3 = rst_i | rst_stages[1];
 			 assign rst4 = rst_i | rst_stages[0];
@@ -302,18 +307,21 @@
 
 
   			 //IF stage
-  			 if_stage IF_ins(clk_i,
+  			 if_stage IF_ins(RESET_ADDR, 
+                             clk_i,
   			 				 rst_i,
   			 				 PC_JB_if,
   			 				 CSR_data_out,   //PC for trap
   			 				 PC_control_if,
   			 				 IF_en,
+                             is_stallx,
   			 				 instr_if,
   			 				 PC4_if,
   			 				 PC_if,
   			 				 trap_code_if,
   			 				 is_trap_if,
   			 				 stall_if,
+                             is_trap_taken,
   			 				 iwbm_addr_o,  			 				
   			 				 iwbm_cyc_o,
                              iwbm_stb_o,
@@ -607,6 +615,7 @@
 			                            is_trap_mem_oo,     
 			                            is_rs0_mem_o,
 			                            data_wb_mem,
+                                        addr_misa_mem,
 			                            //control  		   
   		                                we_wb_mem,
   		                                mux_wb_sel_mem,
@@ -626,6 +635,7 @@
 										is_trap_wb_i,      
 										is_rs0_wb,
 										data_wb_wb,
+                                        addr_misa_wb,
 										//control
 										we_wb_wb_i,
 							  		    mux_wb_sel_wb,
@@ -653,6 +663,7 @@
 									 csr_op_wb,
 									 comp_wb,
 									 is_mret_wb,
+                                     addr_misa_wb,
 									 //interrupts
 									 xint_meip_i,
                                      xint_mtip_i,
@@ -689,6 +700,7 @@
   			 							  ctrl_forwb,
   			 							  en_stages,
   			 							  rst_stages,
-  			 							  IF_en
+  			 							  IF_en,
+                                          is_stallx
   			 	                          );
 endmodule  
