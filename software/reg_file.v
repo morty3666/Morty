@@ -1,5 +1,5 @@
 
-module titan_reg_file(
+module reg_file(
 			input clk,
 			input [4:0] raddr_rs1,
 			input [4:0] raddr_rs2,
