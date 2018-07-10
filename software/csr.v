@@ -1,6 +1,6 @@
 //CSR module for XYZ Processor Core. Author: Jesus Colmenares / 14-11384
 
-module csr(input wire clk_i,
+module csr (input wire clk_i,
 		   input wire rst_i,
 		   input wire is_csr_i,  //flag to CSR    CONTROL SIGNAL
 		   input wire is_trap_i,  //flag to trap
@@ -9,9 +9,11 @@ module csr(input wire clk_i,
 		   input wire [31:0] data_i,  //data 
 		   input wire [11:0] addr_i, //CSR addr
 		   input wire [1:0] op_i,  //determine CSR instruction  CONTROL SIGNAL
+           input wire [31:0] addr_misa,
 		   /* verilator lint_off UNUSED */
 		   input wire [31:0] PC_i, //current PC, needed if trap or interrupt
 		   input wire [3:0] trap_cause_i, //trap cause code
+           input wire       is_mret,  //flag for mret instruction
 		   //Interrupts
 		   input wire 		 is_interrupt,  //flag for interrupts
 		   input wire        int_meip_i,
@@ -20,7 +22,9 @@ module csr(input wire clk_i,
 
 
 		   output reg [31:0] data_o,
-		   output reg  err_o);
+           output reg [31:0] data_read_o,
+		   output reg  err_o
+           );
 
 	
 	//Implemented registers
@@ -52,19 +56,22 @@ module csr(input wire clk_i,
 
     //Exception caused by CSR.
     localparam E_ILLEGAL_INST = 4'd2;
+    localparam I_M_SOFTWARE   = 4'd3;
+    localparam I_M_TIMER      = 4'd7;
+    localparam I_M_EXTERNAL   = 4'd11;
 
     //Register File
-    reg [31:0] mvendorid = 32'h123; //random value
-    reg [31:0] marchid = 32'h456;	//random value
-    reg [31:0] mimpid = 32'h678;	//random value
-    reg [31:0] mhartid = 32'h912;   //random value
+    reg [31:0] mvendorid = 32'h0; //random value
+    reg [31:0] marchid = 32'h0;	//random value
+    reg [31:0] mimpid = 32'h0;	//random value
+    reg [31:0] mhartid = 32'h0;   //random value
     reg [31:0] misa, medeleg, mideleg, mtvec, mcounteren, mscratch;
     reg [31:0] mepc, mtval, mcycle, minstret, mcycleh, minstreth;
     //Special registers
     wire [31:0] mcause, mie, mip, mstatus;
     //special fields
-    reg [1:0]   mstatus_mpp;
-    reg         mstatus_mpie, mstatus_mie;
+   
+    reg         mstatus_mie;
     reg         mie_meie, mie_mtie, mie_msie;
     reg         mcause_interrupt;
     reg [3:0]   mcause_mecode;
@@ -74,7 +81,12 @@ module csr(input wire clk_i,
     wire error_r;  //error reading
     wire error_c;  //error determining write data.
     reg  error_w;  //error writing
-    wire is_write;
+    wire is_write;    
+    wire valid_write;
+
+    assign valid_write = ((addr_i==MSTATUS) | (addr_i==MISA) | (addr_i==MEDELEG) | (addr_i==MIDELEG) | (addr_i==MIE) | (addr_i==MTVEC) | (addr_i==MCOUNTEREN) | (addr_i==MSCRATCH) | (addr_i==MEPC) | (addr_i==MCAUSE) | (addr_i==MTVAL) | (addr_i==MCYCLE) | (addr_i==MINSTRET) | (addr_i==MCYCLEH) | (addr_i==MINSTRETH));
+
+    assign data_read_o = data_read;
 
     always @(*) begin  //determine if must write based on rs1
 
@@ -84,11 +96,12 @@ module csr(input wire clk_i,
     		is_write=1'b1;       	
     end
 
+
   //assignments to special registers
   	always @(*) begin
   		mip     = {20'b0, int_meip_i, 3'b0, int_mtip_i, 3'b0, int_msip_i, 3'b0};
     	mie     = {20'b0, mie_meie, 3'b0, mie_mtie, 3'b0, mie_msie, 3'b0};
-    	mstatus = {19'b0, mstatus_mpp, 3'b0, mstatus_mpie, 3'b0, mstatus_mie, 3'b0};      	
+    	mstatus = {28'b0, mstatus_mie, 3'b0};      	
     	mcause  = {mcause_interrupt, 27'b0, mcause_mecode};  		
   	end
  	
@@ -120,7 +133,7 @@ module csr(input wire clk_i,
 		        default: begin 
 		        			data_read = 32'h0;
                             if(is_csr_i)
-		        			   error_r=1;
+		        			   error_r=1;   //ARREGLAR
                             else
                                error_r=0;
 		        		end
@@ -137,7 +150,7 @@ module csr(input wire clk_i,
                 begin
             		data_o <= 32'h0;                    
             		error_w <= 1'h0;            		
-            		misa <= 32'h0;
+            		misa <= {2'b01, 30'b0};
             		medeleg <= 32'h0;
             		mideleg <= 32'h0;            		
             		mtvec <= 32'h0;
@@ -150,9 +163,7 @@ module csr(input wire clk_i,
            			mcycleh <= 32'h0;
            			minstreth <= 32'h0;
            			//Special fields
-         	  		mstatus_mpp <= 2'b0;
-    		        mstatus_mpie <= 1'b0;
-    		        mstatus_mie <= 1'b0;
+         	  	    mstatus_mie <= 1'b0;
     	            mie_meie <= 1'b0;
     	            mie_mtie <= 1'b0;
     	            mie_msie <= 1'b0;
@@ -162,29 +173,17 @@ module csr(input wire clk_i,
 
             else 
                 begin
-                    if (is_trap_i | is_interrupt | error_r | error_c) //set a trap
-                        begin
-                            if(is_interrupt)
-                                mcause_interrupt <= 1'b1;
-
-                            if(error_r | error_c)
-                                mcause_mecode <= E_ILLEGAL_INST;
-                            else
-                                mcause_mecode <= trap_cause_i;                                              
-                                                        
-                            mepc <= {PC_i[31:2], 2'b0};
-                            data_o <= mtvec;
-                                                                   
-                        end
+                    
+                    if(is_csr_i & is_mret)
+                            data_o <= mepc;                        
+                    
 
             	    else if  (is_csr_i & is_write)  //sequencial write to CSR
                         begin
-                		  case(addr_i)
+                		  case(addr_i)                          
 
                 			MSTATUS: begin
-	            						mstatus_mpp <= data_write[12:11];
-	       								mstatus_mpie <= data_write[7];
-	       								mstatus_mie <= data_write[3];
+	            						mstatus_mie <= data_write[3];
                                         data_o <= data_read;
                                         error_w <= 1'b0;
                 					end
@@ -261,17 +260,53 @@ module csr(input wire clk_i,
                                             data_o <= data_read;
                                             error_w <= 1'b0;
                                         end
-                			default: begin
-                                error_w <= 1'b1;
+                			default: begin                                
                                 mepc <= {PC_i[31:2], 2'b0};
                                 mcause_mecode <= E_ILLEGAL_INST;
                                 data_o <= mtvec;                                                                  
                                 end   		
                 		    endcase                        
-                    end 
+                    end
+
+                    else if (is_trap_i | error_r | error_c| (is_interrupt & mstatus_mie)) //set a trap
+                        begin
+
+                            if(error_r | error_c)
+                                mcause_mecode <= E_ILLEGAL_INST;
+
+                            else if(is_interrupt & mstatus_mie) begin                                
+                            
+                               mcause_interrupt <= 1'b1;
+
+                               if(mie_msie & int_msip_i)                               
+                                    mcause_mecode <= I_M_SOFTWARE;
+
+                                else if(mie_mtie & int_mtip_i)
+                                    mcause_mecode <= I_M_TIMER;
+
+                                else if(mie_meie & int_meip_i)
+                                    mcause_mecode <= I_M_EXTERNAL; 
+                                else
+                                    mcause_mecode <= 4'b0; 
+
+                            end                           
+                            
+                            else                             
+                                mcause_mecode <= trap_cause_i;                                                                      
+                                                        
+                                mepc <= {PC_i[31:2], 2'b0};
+                                data_o <= mtvec;
+
+                                 if(trap_cause_i==4'd4 | trap_cause_i==4'd6) 
+                                    mtval <= addr_misa;
+                                 else if(trap_cause_i==4'b0)
+                                 	mtval <= PC_i;
+                                else
+                                    mtval <= 32'b0;                           
+                                                                   
+                        end
                     else begin
-                        data_o <= data_read;
-                        error_w <= 1'b0;
+                        data_o <= data_read;                        
                         end                                       
                                                        
                 end
@@ -280,7 +315,7 @@ module csr(input wire clk_i,
         //Set flag error.
     always @(*) begin
 
-        if(error_r | error_c | error_w)
+        if(error_r | error_c | (~valid_write & is_write & is_csr_i))
             err_o=1'b1;
         else 
             err_o=1'b0;        
@@ -292,7 +327,7 @@ module csr(input wire clk_i,
         case(op_i)
             2'b01:  data_write = data_i;
             2'b10:  data_write = data_i | data_read;
-            2'b11:  data_write = data_i & ~data_read;
+            2'b11:  data_write = ~data_i & data_read;
             default: begin
                         data_write= 32'h0;
                         if(is_csr_i) error_c = 1'b1;
