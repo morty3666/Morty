@@ -26,7 +26,7 @@ module load_unit( 	input wire [31:0] data_mem_i,
 					2'b11: data_sel_LB= data_mem_i[31:24];
 		endcase
 
-		case(addr_i[0])
+		case(addr_i[1])
 					1'b0: data_sel_LH= data_mem_i[15:0];
 					1'b1: data_sel_LH= data_mem_i[31:16];
 		endcase
