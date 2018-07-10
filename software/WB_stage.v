@@ -17,7 +17,8 @@ module WB_stage(input wire clk_i,
 				input wire [1:0] mux_sel_i,  //Control signal
 				input wire [1:0] csr_op_i,	//Control signal
 				input wire comp_i, //control signal, used by WB for inst STL
-				input wire       is_mret_i,  //control signal flag for mret instruction			
+				input wire       is_mret_i,  //control signal flag for mret instruction
+				input wire [31:0] addr_misa,			
 				//interrupts ports
 				input wire        int_meip_wb_i,
            		input wire        int_mtip_wb_i,
@@ -43,10 +44,7 @@ module WB_stage(input wire clk_i,
 
 		always @(*) begin
 			//set signal for hazard unit
-			if(is_trap_wb_i | csr_err)
-				is_trap_wb_o=1'b1;  
-			else
-				is_trap_wb_o=1'b0;
+			is_trap_wb_o = is_trap_wb_i | csr_err;		
 
 			//Select WB data
 			if(is_trap_wb_i)
@@ -67,7 +65,7 @@ module WB_stage(input wire clk_i,
 		end
 
 		//Implementing CSR
-	csr csr_ins(clk_i,rst_i,is_csr_wb_i,is_trap_wb_i,rd_wb_i,is_rs1_wb_i,csr_data_wb_i,csr_addr_wb_i,csr_op_i,PC_wb_i,trap_code_wb_i, is_mret_i,
+	csr csr_ins(clk_i,rst_i,is_csr_wb_i,is_trap_wb_i,rd_wb_i,is_rs1_wb_i,csr_data_wb_i,csr_addr_wb_i,csr_op_i, addr_misa,PC_wb_i,trap_code_wb_i, is_mret_i,
 				is_interrupt, int_meip_wb_i,int_mtip_wb_i,int_msip_wb_i,CSR_data_out, data_CSR_read,csr_err);
 
 	endmodule
