@@ -48,7 +48,7 @@ module LSU( input wire clk_i,
 							endcase						
 						end
 						SH: begin
-							case(addr_i[0])
+							case(addr_i[1])
 								1'b0: wbm_sel_o<=4'b0011;
 								1'b1: wbm_sel_o<=4'b1100;								
 							endcase							
@@ -77,9 +77,6 @@ module LSU( input wire clk_i,
 	end
 
 endmodule
-
-
-
 
 
             
